@@ -8,7 +8,7 @@ RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
 
 # Build packages
-RUN pip install --user --no-cache-dir --no-warn-script-location 'liveproxy==2.0.0' 'streamlink==2.4.0' youtube-dl
+RUN pip install --user --no-cache-dir --no-warn-script-location 'liveproxy==2.0.0' 'streamlink==3.0.3' youtube-dl
 
 # Create Liveproxy container
 FROM ${ALPINE_IMAGE} as liveproxy
