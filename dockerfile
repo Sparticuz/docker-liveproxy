@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=python:3-alpine3.14
+ARG ALPINE_IMAGE=python:3-alpine3.15
 
 FROM ${ALPINE_IMAGE} as build
 
@@ -8,12 +8,12 @@ RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
 
 # Build packages
-RUN pip install --user --no-cache-dir --no-warn-script-location 'liveproxy==2.0.0' 'streamlink==3.0.3' youtube-dl
+RUN pip install --user --no-cache-dir --no-warn-script-location 'liveproxy==2.0.0' 'streamlink==3.2.0' youtube-dl
 
 # Create Liveproxy container
 FROM ${ALPINE_IMAGE} as liveproxy
 
-# Install binary dependnecies
+# Install binary dependencies
 RUN apk --no-cache add ffmpeg libxml2 libxslt
 RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
