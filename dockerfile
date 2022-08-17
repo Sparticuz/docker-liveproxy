@@ -16,8 +16,8 @@ RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
 
 # Build streamlink and liveproxy
-RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==4.2.0' && \
-  pip install --user --no-cache-dir --no-warn-script-location git+https://github.com/back-to/liveproxy.git@4124fd8
+RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==4.3.0' && \
+  pip install --user --no-cache-dir --no-warn-script-location git+https://github.com/back-to/liveproxy.git@35cad27
 
 # Create Liveproxy container
 FROM ${ALPINE_IMAGE} as liveproxy
