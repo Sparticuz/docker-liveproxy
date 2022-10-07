@@ -1,0 +1,7 @@
+#EXTM3U
+#EXTINF:-1 group-title="Test",Streamlink
+http://127.0.0.1:53422/base64/c3RyZWFtbGluayBodHRwczovL3d3dy55b3V0dWJlLmNvbS91c2VyL2ZyYW5jZTI0L2xpdmUgYmVzdA==/
+#EXTINF:-1 group-title="Test",youtube-dl
+http://127.0.0.1:53422/base64/eW91dHViZS1kbCBodHRwczovL3d3dy55b3V0dWJlLmNvbS91c2VyL2ZyYW5jZTI0L2xpdmU=/
+#EXTINF:-1 group-title="Test",yt-dlp
+http://127.0.0.1:53422/base64/eXQtZGxwIGh0dHBzOi8vd3d3LnlvdXR1YmUuY29tL3VzZXIvZnJhbmNlMjQvbGl2ZQ==/
