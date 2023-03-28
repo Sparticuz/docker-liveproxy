@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=python:3-alpine3.16
+ARG ALPINE_IMAGE=python:3-alpine3.17
 
 FROM ${ALPINE_IMAGE} as build
 
@@ -16,7 +16,7 @@ RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
 
 # Build streamlink and liveproxy
-RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==5.1.2' && \
+RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==5.3.1' && \
   pip install --user --no-cache-dir --no-warn-script-location git+https://github.com/back-to/liveproxy.git@35cad27
 
 # Create Liveproxy container
