@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=python:3-alpine3.17
+ARG ALPINE_IMAGE=python:3-alpine3.18
 
 FROM ${ALPINE_IMAGE} as build
 
@@ -6,8 +6,11 @@ FROM ${ALPINE_IMAGE} as build
 RUN apk --no-cache add curl gcc git libxml2-dev libxslt-dev musl-dev
 
 # Install the latest youtube-dl and yt-dlp
-RUN curl -L https://yt-dl.org/downloads/latest/youtube-dl -o /usr/local/bin/youtube-dl
+# RUN curl -L https://yt-dl.org/downloads/latest/youtube-dl -o /usr/local/bin/youtube-dl
+# RUN chmod a+rx /usr/local/bin/youtube-dl
+RUN curl -L https://github.com/ytdl-org/youtube-dl/releases/download/2021.12.17/youtube-dl -o /usr/local/bin/youtube-dl
 RUN chmod a+rx /usr/local/bin/youtube-dl
+RUN /usr/local/bin/youtube-dl -U
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
 RUN chmod a+rx /usr/local/bin/yt-dlp
 
@@ -16,7 +19,7 @@ RUN addgroup -S liveproxy && adduser -S liveproxy -G liveproxy
 USER liveproxy
 
 # Build streamlink and liveproxy
-RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==5.3.1' && \
+RUN pip install --user --no-cache-dir --no-warn-script-location 'streamlink==6.1.0' && \
   pip install --user --no-cache-dir --no-warn-script-location git+https://github.com/back-to/liveproxy.git@35cad27
 
 # Create Liveproxy container
