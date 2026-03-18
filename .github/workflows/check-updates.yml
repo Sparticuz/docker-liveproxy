@@ -1,0 +1,86 @@
+name: Check for dependency updates
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-streamlink:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get current streamlink version from Dockerfile
+        id: current
+        run: |
+          version=$(grep -oP "streamlink==\K[0-9.]+" dockerfile)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Get latest streamlink release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(gh release view --repo streamlink/streamlink --json tagName -q '.tagName')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update Dockerfile
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        run: |
+          sed -i "s/streamlink==${{ steps.current.outputs.version }}/streamlink==${{ steps.latest.outputs.version }}/" dockerfile
+
+      - name: Create Pull Request
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update streamlink to ${{ steps.latest.outputs.version }}"
+          title: "Update streamlink to ${{ steps.latest.outputs.version }}"
+          body: |
+            Updates streamlink from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
+
+            Release notes: https://github.com/streamlink/streamlink/releases/tag/${{ steps.latest.outputs.version }}
+          branch: update/streamlink-${{ steps.latest.outputs.version }}
+          delete-branch: true
+
+  check-yt-dlp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get current yt-dlp version from Dockerfile
+        id: current
+        run: |
+          version=$(grep -oP 'yt-dlp/releases/download/\K[0-9.]+' dockerfile)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Get latest yt-dlp release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(gh release view --repo yt-dlp/yt-dlp --json tagName -q '.tagName')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update Dockerfile
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        run: |
+          sed -i "s|yt-dlp/releases/download/${{ steps.current.outputs.version }}|yt-dlp/releases/download/${{ steps.latest.outputs.version }}|" dockerfile
+
+      - name: Create Pull Request
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update yt-dlp to ${{ steps.latest.outputs.version }}"
+          title: "Update yt-dlp to ${{ steps.latest.outputs.version }}"
+          body: |
+            Updates yt-dlp from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
+
+            Release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/${{ steps.latest.outputs.version }}
+          branch: update/yt-dlp-${{ steps.latest.outputs.version }}
+          delete-branch: true
