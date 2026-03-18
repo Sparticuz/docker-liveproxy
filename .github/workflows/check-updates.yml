@@ -8,79 +8,147 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
-  check-streamlink:
+  check-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Get current streamlink version from Dockerfile
+      # --- Check for updates ---
+
+      - name: Get current versions from Dockerfile
         id: current
         run: |
-          version=$(grep -oP "streamlink==\K[0-9.]+" dockerfile)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          streamlink=$(grep -oP "streamlink==\K[0-9.]+" dockerfile)
+          ytdlp=$(grep -oP 'yt-dlp/releases/download/\K[0-9.]+' dockerfile)
+          echo "streamlink=$streamlink" >> "$GITHUB_OUTPUT"
+          echo "ytdlp=$ytdlp" >> "$GITHUB_OUTPUT"
 
-      - name: Get latest streamlink release
+      - name: Get latest upstream versions
         id: latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(gh release view --repo streamlink/streamlink --json tagName -q '.tagName')
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          streamlink=$(gh release view --repo streamlink/streamlink --json tagName -q '.tagName')
+          ytdlp=$(gh release view --repo yt-dlp/yt-dlp --json tagName -q '.tagName')
+          echo "streamlink=$streamlink" >> "$GITHUB_OUTPUT"
+          echo "ytdlp=$ytdlp" >> "$GITHUB_OUTPUT"
 
-      - name: Update Dockerfile
-        if: steps.current.outputs.version != steps.latest.outputs.version
+      - name: Check if updates are available
+        id: check
         run: |
-          sed -i "s/streamlink==${{ steps.current.outputs.version }}/streamlink==${{ steps.latest.outputs.version }}/" dockerfile
+          updated=false
+          summary=""
+          if [ "${{ steps.current.outputs.streamlink }}" != "${{ steps.latest.outputs.streamlink }}" ]; then
+            updated=true
+            summary="streamlink ${{ steps.current.outputs.streamlink }} -> ${{ steps.latest.outputs.streamlink }}"
+          fi
+          if [ "${{ steps.current.outputs.ytdlp }}" != "${{ steps.latest.outputs.ytdlp }}" ]; then
+            updated=true
+            if [ -n "$summary" ]; then
+              summary="$summary, "
+            fi
+            summary="${summary}yt-dlp ${{ steps.current.outputs.ytdlp }} -> ${{ steps.latest.outputs.ytdlp }}"
+          fi
+          echo "updated=$updated" >> "$GITHUB_OUTPUT"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
 
-      - name: Create Pull Request
-        if: steps.current.outputs.version != steps.latest.outputs.version
-        uses: peter-evans/create-pull-request@v7
+      # --- Update Dockerfile ---
+
+      - name: Update streamlink version
+        if: steps.current.outputs.streamlink != steps.latest.outputs.streamlink
+        run: |
+          sed -i "s/streamlink==${{ steps.current.outputs.streamlink }}/streamlink==${{ steps.latest.outputs.streamlink }}/" dockerfile
+
+      - name: Update yt-dlp version
+        if: steps.current.outputs.ytdlp != steps.latest.outputs.ytdlp
+        run: |
+          sed -i "s|yt-dlp/releases/download/${{ steps.current.outputs.ytdlp }}|yt-dlp/releases/download/${{ steps.latest.outputs.ytdlp }}|" dockerfile
+
+      # --- Commit ---
+
+      - name: Commit updated Dockerfile
+        if: steps.check.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dockerfile
+          git commit -m "Update ${{ steps.check.outputs.summary }}"
+          git push
+
+      # --- Build and push Docker image ---
+
+      - name: Set up QEMU
+        if: steps.check.outputs.updated == 'true'
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.updated == 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        if: steps.check.outputs.updated == 'true'
+        uses: docker/login-action@v4
         with:
-          commit-message: "Update streamlink to ${{ steps.latest.outputs.version }}"
-          title: "Update streamlink to ${{ steps.latest.outputs.version }}"
-          body: |
-            Updates streamlink from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            Release notes: https://github.com/streamlink/streamlink/releases/tag/${{ steps.latest.outputs.version }}
-          branch: update/streamlink-${{ steps.latest.outputs.version }}
-          delete-branch: true
-
-  check-yt-dlp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get current yt-dlp version from Dockerfile
-        id: current
-        run: |
-          version=$(grep -oP 'yt-dlp/releases/download/\K[0-9.]+' dockerfile)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Get latest yt-dlp release
-        id: latest
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          version=$(gh release view --repo yt-dlp/yt-dlp --json tagName -q '.tagName')
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Update Dockerfile
-        if: steps.current.outputs.version != steps.latest.outputs.version
-        run: |
-          sed -i "s|yt-dlp/releases/download/${{ steps.current.outputs.version }}|yt-dlp/releases/download/${{ steps.latest.outputs.version }}|" dockerfile
-
-      - name: Create Pull Request
-        if: steps.current.outputs.version != steps.latest.outputs.version
-        uses: peter-evans/create-pull-request@v7
+      - name: Build Docker image (load for testing)
+        if: steps.check.outputs.updated == 'true'
+        uses: docker/build-push-action@v7
         with:
-          commit-message: "Update yt-dlp to ${{ steps.latest.outputs.version }}"
-          title: "Update yt-dlp to ${{ steps.latest.outputs.version }}"
-          body: |
-            Updates yt-dlp from `${{ steps.current.outputs.version }}` to `${{ steps.latest.outputs.version }}`.
+          context: .
+          file: ./dockerfile
+          load: true
+          tags: sparticuz/liveproxy:test
 
-            Release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/${{ steps.latest.outputs.version }}
-          branch: update/yt-dlp-${{ steps.latest.outputs.version }}
-          delete-branch: true
+      # --- Smoke tests ---
+
+      - name: Smoke test - verify binaries
+        if: steps.check.outputs.updated == 'true'
+        run: |
+          echo "--- Checking streamlink ---"
+          docker run --rm --entrypoint streamlink sparticuz/liveproxy:test --version
+          echo "--- Checking yt-dlp ---"
+          docker run --rm --entrypoint yt-dlp sparticuz/liveproxy:test --version
+          echo "--- Checking liveproxy ---"
+          docker run --rm --entrypoint liveproxy sparticuz/liveproxy:test --help
+          echo "All binary checks passed."
+
+      - name: Smoke test - verify stream (best-effort)
+        if: steps.check.outputs.updated == 'true'
+        continue-on-error: true
+        run: |
+          # Start liveproxy in the background
+          docker run -d --name liveproxy-test -p 53422:53422 sparticuz/liveproxy:test
+          sleep 3
+
+          # yt-dlp France24 live stream via liveproxy
+          url="http://127.0.0.1:53422/cmd/yt-dlp https://www.youtube.com/user/france24/live"
+          echo "Requesting stream from liveproxy..."
+
+          # Fetch up to 10 seconds, capture at least some bytes
+          bytes=$(curl -s -m 10 -o /tmp/stream-test.bin -w '%{size_download}' "$url" || true)
+
+          # Clean up
+          docker stop liveproxy-test > /dev/null 2>&1 || true
+
+          if [ "${bytes:-0}" -gt 0 ]; then
+            echo "Stream test PASSED: received $bytes bytes."
+          else
+            echo "Stream test FAILED: received 0 bytes (non-blocking)."
+            echo "This may be due to network restrictions on the runner or the stream being offline."
+          fi
+
+      # --- Push multi-arch image ---
+
+      - name: Build and push multi-arch image
+        if: steps.check.outputs.updated == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: sparticuz/liveproxy:latest
